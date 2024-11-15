@@ -240,6 +240,26 @@
     <string>LKA Proc</string>
    </property>
   </widget>
+  <widget class="QPushButton" name="warn_but">
+   <property name="geometry">
+    <rect>
+     <x>540</x>
+     <y>380</y>
+     <width>101</width>
+     <height>51</height>
+    </rect>
+   </property>
+   <property name="font">
+    <font>
+     <pointsize>12</pointsize>
+     <weight>75</weight>
+     <bold>true</bold>
+    </font>
+   </property>
+   <property name="text">
+    <string>Warning</string>
+   </property>
+  </widget>
  </widget>
  <resources/>
  <connections/>

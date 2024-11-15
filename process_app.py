@@ -17,6 +17,8 @@ from datetime import datetime, timezone
 import numpy as np
 import geopy.distance
 from scipy.signal import butter, filtfilt
+import cv2
+import os
 
 N = 4
 Fc = .5
@@ -45,7 +47,13 @@ def find_first_match(lst, condition):
     for index, item in enumerate(lst):
         if condition(item):
             return index, item
-    return None, None  # Return None if no match is found
+    return None, None # Return None if no match is found
+
+def find_last_match(lst, condition):
+    for index, item in reversed(list(enumerate(lst))):
+        if condition(item):
+            return index, item
+    return None, None
 
 def find_best_match(x_ls, y_ls, x0):
     index,_ = find_first_match(x_ls, lambda x: float(x) >= x0)
@@ -66,6 +74,30 @@ def min_search(x, y, x0, y0):
     s = np.sign((P1[0] - P0[0]) * (y0 - P0[1]) - (P1[1] - P0[1]) * (x0 - P0[0]))
     d = geopy.distance.geodesic(P1, (x0, y0)).m
     return d*s
+
+def classify_image(frame, i=0):
+    frame = cv2.resize(frame, (1600, 900))
+    frame = frame[40:47,230:320]
+    if i > 0:
+        cv2.imwrite(f'New/{i}.png', frame)
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    color_ranges = {
+        "white": ([200, 200, 200], [255, 255, 255]),  # Light colors
+        "orange": ([200, 100, 0], [255, 180, 100]),   # Orange tones
+        "blue": ([0, 0, 100], [100, 150, 255]),       # Blue tones
+    }
+    color_counts = {color: 0 for color in color_ranges.keys()}
+    for color, (lower, upper) in color_ranges.items():
+        lower = np.array(lower, dtype="uint8")
+        upper = np.array(upper, dtype="uint8")
+        mask = cv2.inRange(frame, lower, upper)
+        color_counts[color] += cv2.countNonZero(mask)
+
+    dominant_color = max(color_counts, key=color_counts.get)
+    if dominant_color=='orange':
+        return True
+    else:
+        return False
 
 class Ui_Dialog(object):
     def __init__(self):
@@ -157,6 +189,14 @@ class Ui_Dialog(object):
         font.setWeight(75)
         self.lka_but.setFont(font)
         self.lka_but.setObjectName("lka_but")
+        self.warn_but = QtWidgets.QPushButton(Dialog)
+        self.warn_but.setGeometry(QtCore.QRect(540, 380, 101, 51))
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        font.setBold(True)
+        font.setWeight(75)
+        self.warn_but.setFont(font)
+        self.warn_but.setObjectName("warn_but")
 
         self.retranslateUi(Dialog)
         QtCore.QMetaObject.connectSlotsByName(Dialog)
@@ -166,6 +206,7 @@ class Ui_Dialog(object):
         self.process_but.clicked.connect(self.actionProcess)
         self.conv_but.clicked.connect(self.actionConv)
         self.lka_but.clicked.connect(self.actionLKA)
+        self.warn_but.clicked.connect(self.actionWarn)
 
     def retranslateUi(self, Dialog):
         _translate = QtCore.QCoreApplication.translate
@@ -181,6 +222,7 @@ class Ui_Dialog(object):
         self.process_but.setText(_translate("Dialog", "AEB Sync"))
         self.conv_but.setText(_translate("Dialog", "VBO to CSV"))
         self.lka_but.setText(_translate("Dialog", "LKA Proc"))
+        self.warn_but.setText(_translate("Dialog", "Warning"))
 
     def actionOpen_File_VBO(self):
         temp = QtWidgets.QFileDialog.getOpenFileName(caption='Select *.vbo file', filter='vbo(*.vbo)')
@@ -240,7 +282,7 @@ class Ui_Dialog(object):
         vbo['UTC_Time'] = utc_list
         stride = pd.read_csv(self.RST_FILE_NAME)
 
-        coords_trigger = (42.2422311, -83.5482209)
+        coords_trigger = (42.2421774, -83.5485989)
         relDistance = []
         for i in range(len(vbo)):
             coord = (float(vbo.loc[i, 'PosLat'])*1e-7, float(vbo.loc[i, 'PosLon'])*1e-7)
@@ -274,7 +316,7 @@ class Ui_Dialog(object):
         rel_dist = [float(i)-v0 for i in vbo['relDistance']]
         vbo['relDistance'] = ['{:010.4f}'.format(i) for i in rel_dist]
 
-        coords_trigger = (42.2422311, -83.5482209)
+        # coords_trigger = (42.2422311, -83.5482209)
         cords = []
         for i in range(len(stride)):
             cords.append((stride.loc[i, 'latitude(deg)'], stride.loc[i, 'longitude(deg)']))
@@ -378,8 +420,8 @@ class Ui_Dialog(object):
         msg.setIcon(QMessageBox.Information)
         msg.exec_()
 
-    def actionConv(self):
-        if not self.vbo_received:
+    def actionWarn(self):
+        if not (self.vbo_received) or '_E.vbo' not in self.VBO_FILE_NAME:
             return 
         secs=[]
         with open(self.VBO_FILE_NAME, 'r') as f:
@@ -391,28 +433,151 @@ class Ui_Dialog(object):
         with open(self.VBO_FILE_NAME, 'r') as f:
             for sec in secs:
                 if 'column names' in sec[0]:
-                    cols = f.readlines()[sec[1]+1].split(' ')[:-1]
+                    cols = f.readlines()[sec[1]+1].split(' ')
+        if cols[-1] in [' ', '', '\n']:
+                cols = cols[:-1]
                     
         with open(self.VBO_FILE_NAME, 'r') as f:
             for sec in secs:
                 if 'data' in sec[0]:
                     lines = f.readlines()[sec[1]+1:]
 
+        with open(self.VBO_FILE_NAME, 'r') as f:
+            for sec in secs:
+                if 'AVI' in sec[0]:
+                    AVI_PATH = f.readlines()[sec[1]+1][:-1] + '0001.mp4'
+        AVI_PATH =os.path.dirname(self.VBO_FILE_NAME)+'/'+ AVI_PATH
+
         df = []
         for l in lines:
             df.append(list(l[:-1].split(' ')))
         vbo = pd.DataFrame(df, columns=cols)
-        utc_list = []
-        for i in range(len(vbo)):
-            utc_list.append(utc_ms_gen(vbo, i))
-        vbo['UTC_Time'] = utc_list
+        
+        t = []
+        w = []
+        idx = 1
+        cap = cv2.VideoCapture(AVI_PATH)
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            if classify_image(frame):
+                w.append(1)
+            else:
+                w.append(0)
+            t.append(cap.get(cv2.CAP_PROP_POS_MSEC))
+            idx += 1
+        cap.release()
+        
+        tm = np.array(t) / 1000 - 2.9
+        tv = np.array([float(i) for i in vbo['time']])
+        tv = np.array(range(len(tv)))*.1
+        index, _ = find_first_match(w, lambda x: x == 1)
+        if not index==None:
+            warn_on, _ = find_first_match(tv, lambda x: x >= tm[index])
+            index, _ = find_last_match(w, lambda x: x == 1)
+            warn_off, _ = find_first_match(tv, lambda x: x >= tm[index])
+            warn = np.array([0 for i in tv])
+            warn[warn_on:warn_off] = 1
+            vbo['Warning'] = ['{:01.0f}'.format(i) for i in warn]
+        else:
+            vbo['Warning'] = ['0' for i in tv]
+        
+        vbo.to_csv('vbo.csv', sep=' ', header=None, index=None)
+        msg = QMessageBox()
+        msg.setWindowTitle("Save CSV")
+        msg.setText(f"Would you like to save data as CSV?")
+        msg.setIcon(QMessageBox.Question)
+        msg.setStandardButtons(QMessageBox.Yes|QMessageBox.No)
+        msg.setDefaultButton(QMessageBox.Yes)
+        result = msg.exec_()
+        if result == QMessageBox.Yes:
+            NAME = self.VBO_FILE_NAME[:-4] + '_RAW.csv'
+            vbo.to_csv(NAME, sep=',', index=None)
+            
+        TARGET_FILE_NAME = self.VBO_FILE_NAME
+        with open(self.VBO_FILE_NAME, 'r') as f:
+            T_header = f.readlines()[:secs[1][1]-1]
+            if not any(['Warning' in a for a in cols]):
+                T_header.append('Warning\n')
+            T_header.append('\n')
+        with open(self.VBO_FILE_NAME, 'r') as f:
+            T_channel_units = f.readlines()[secs[1][1]:secs[2][1]-1]
+            if not any(['Warning' in a for a in cols]):
+                T_channel_units.append('(null)\n')
+            T_channel_units.append('\n')
 
-        NAME = self.VBO_FILE_NAME[:-4] + '_RAW.csv'
-        vbo.to_csv(NAME, sep=',', index=None)
+        with open(self.VBO_FILE_NAME, 'r') as f:
+            T_fill = f.readlines()[secs[2][1]:secs[4][1]-1]
+            T_fill.append('\n')
+
+        with open(self.VBO_FILE_NAME, 'r') as f:
+            T_columns = f.readlines()[secs[4][1]:secs[5][1]+1]
+            if not any(['Warning' in a for a in cols]):
+                T_columns[1] = T_columns[1][:-1]+' Warning\n'
+
+        with open('vbo.csv', 'r') as f:
+            data = f.readlines()
+
+        with open(TARGET_FILE_NAME, 'w') as f:
+            for l in T_header:
+                f.write(l)
+            for l in T_channel_units:
+                f.write(l)
+            for l in T_fill:
+                f.write(l)
+            for l in T_columns:
+                f.write(l)
+            for l in data:
+                f.write(l)
         
         msg = QMessageBox()
         msg.setWindowTitle("Accomplished")
-        msg.setText('New file:' + NAME)
+        msg.setText('New file:' + TARGET_FILE_NAME)
+        msg.setIcon(QMessageBox.Information)
+        msg.exec_()
+
+    def actionConv(self):
+        temp = QtWidgets.QFileDialog.getOpenFileNames(caption='Select *.vbo files', filter='vbo(*.vbo)')
+        if not temp:
+            return
+               
+        for VBO_FILE_NAME in temp[0]:
+            secs=[]
+            with open(VBO_FILE_NAME, 'r') as f:
+                for i, l in enumerate(f):    
+                    if '[' in l:
+                        header = secs.append((l, i))
+
+
+            with open(VBO_FILE_NAME, 'r') as f:
+                for sec in secs:
+                    if 'column names' in sec[0]:
+                        cols = f.readlines()[sec[1]+1].split(' ')
+            if cols[-1] in [' ', '', '\n']:
+                cols = cols[:-1]
+                        
+            with open(VBO_FILE_NAME, 'r') as f:
+                for sec in secs:
+                    if 'data' in sec[0]:
+                        lines = f.readlines()[sec[1]+1:]
+
+            df = []
+            for l in lines:
+                df.append(list(l[:-1].split(' ')))
+
+            vbo = pd.DataFrame(df, columns=cols)
+            utc_list = []
+            for i in range(len(vbo)):
+                utc_list.append(utc_ms_gen(vbo, i))
+            vbo['UTC_Time'] = utc_list
+
+            NAME = VBO_FILE_NAME[:-4] + '_RAW.csv'
+            vbo.to_csv(NAME, sep=',', index=None)
+            
+        msg = QMessageBox()
+        msg.setWindowTitle("Accomplished")
+        msg.setText(f'{len(temp[0])} files have been converted')
         msg.setIcon(QMessageBox.Information)
         msg.exec_()
 
