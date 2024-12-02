@@ -28,6 +28,9 @@ b, a = butter(N, Wn, 'low')
 
 streering_func = np.poly1d([-481.62457676, 5519.05946954, -20719.85044531, 25454.9924588])
 
+script_path = os.path.abspath(__file__)
+script_directory = os.path.dirname(script_path)
+
 
 def get(a):
     return str(int(float(a)))
@@ -110,7 +113,7 @@ class Ui_Dialog(object):
         self.logo = QtWidgets.QLabel(Dialog)
         self.logo.setGeometry(QtCore.QRect(0, 0, 731, 81))
         self.logo.setText("")
-        self.logo.setPixmap(QtGui.QPixmap("logo.jpg"))
+        self.logo.setPixmap(QtGui.QPixmap(os.path.join(script_directory,"logo.jpg")))
         self.logo.setScaledContents(True)
         self.logo.setObjectName("logo")
         self.vbo = QtWidgets.QGroupBox(Dialog)
