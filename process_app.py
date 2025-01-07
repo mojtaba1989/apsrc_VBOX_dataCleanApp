@@ -19,6 +19,7 @@ import geopy.distance
 from scipy.signal import butter, filtfilt
 import cv2
 import os
+import math
 
 N = 4
 Fc = .5
@@ -31,6 +32,36 @@ streering_func = np.poly1d([-481.62457676, 5519.05946954, -20719.85044531, 25454
 script_path = os.path.abspath(__file__)
 script_directory = os.path.dirname(script_path)
 
+rep = []
+max_rep = 20
+def reportUpdate(str, obj, new=False):
+    if max_rep > -1:
+        while len(rep)>max_rep:
+            rep.pop(0)
+    if new or not rep:
+        rep.append(str)
+    else:
+        rep[-1] = str
+    if len(rep)>6:
+        rep.pop(0)
+    rep_str = ''
+    for l in rep:
+        rep_str += l+'\n'
+    obj.setText(rep_str)
+    obj.repaint()
+
+def closest_match(set1, set2):
+    best_point = None
+    min_distance = float('inf')
+
+    for p1 in set1:
+        for p2 in set2:
+            distance = math.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
+            if distance < min_distance:
+                min_distance = distance
+                best_point = (p1, p2)
+    
+    return best_point, min_distance
 
 def get(a):
     return str(int(float(a)))
@@ -104,20 +135,47 @@ def classify_image(frame, i=0):
 
 class Ui_Dialog(object):
     def __init__(self):
-        self.vbo_received = False
-        self.str_received = False
+        self.VBO_FILE_NAME = None
+        self.STR_FILE_NAME = None
+        self.GPS_REF_FILE_NAME = None
+        self.IMAGE_FILE_NAME = None
+
 
     def setupUi(self, Dialog):
         Dialog.setObjectName("Dialog")
-        Dialog.resize(713, 449)
+        Dialog.resize(733, 598)
         self.logo = QtWidgets.QLabel(Dialog)
         self.logo.setGeometry(QtCore.QRect(0, 0, 731, 81))
         self.logo.setText("")
-        self.logo.setPixmap(QtGui.QPixmap(os.path.join(script_directory,"logo.jpg")))
+        self.logo.setPixmap(QtGui.QPixmap(".\\logo.jpg"))
         self.logo.setScaledContents(True)
         self.logo.setObjectName("logo")
-        self.vbo = QtWidgets.QGroupBox(Dialog)
-        self.vbo.setGeometry(QtCore.QRect(20, 90, 671, 101))
+        self.report = QtWidgets.QGroupBox(Dialog)
+        self.report.setGeometry(QtCore.QRect(10, 420, 711, 171))
+        font = QtGui.QFont()
+        font.setPointSize(14)
+        self.report.setFont(font)
+        self.report.setObjectName("report")
+        self.report_label = QtWidgets.QLabel(self.report)
+        self.report_label.setGeometry(QtCore.QRect(10, 30, 691, 131))
+        font = QtGui.QFont()
+        font.setPointSize(10)
+        self.report_label.setFont(font)
+        self.report_label.setText("")
+        self.report_label.setObjectName("report_label")
+        self.tabWidget = QtWidgets.QTabWidget(Dialog)
+        self.tabWidget.setGeometry(QtCore.QRect(10, 90, 721, 331))
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        self.tabWidget.setFont(font)
+        self.tabWidget.setDocumentMode(True)
+        self.tabWidget.setMovable(True)
+        self.tabWidget.setTabBarAutoHide(True)
+        self.tabWidget.setObjectName("tabWidget")
+        self.tab_AEB = QtWidgets.QWidget()
+        self.tab_AEB.setObjectName("tab_AEB")
+        self.vbo = QtWidgets.QGroupBox(self.tab_AEB)
+        self.vbo.setGeometry(QtCore.QRect(0, 10, 711, 101))
         font = QtGui.QFont()
         font.setPointSize(14)
         self.vbo.setFont(font)
@@ -129,15 +187,15 @@ class Ui_Dialog(object):
         self.vbo_pwd.setFont(font)
         self.vbo_pwd.setObjectName("vbo_pwd")
         self.browse_vbo_but = QtWidgets.QPushButton(self.vbo)
-        self.browse_vbo_but.setGeometry(QtCore.QRect(580, 40, 71, 41))
+        self.browse_vbo_but.setGeometry(QtCore.QRect(630, 40, 71, 41))
         font = QtGui.QFont()
         font.setPointSize(12)
         font.setBold(True)
         font.setWeight(75)
         self.browse_vbo_but.setFont(font)
         self.browse_vbo_but.setObjectName("browse_vbo_but")
-        self.str = QtWidgets.QGroupBox(Dialog)
-        self.str.setGeometry(QtCore.QRect(20, 200, 671, 101))
+        self.str = QtWidgets.QGroupBox(self.tab_AEB)
+        self.str.setGeometry(QtCore.QRect(0, 120, 711, 101))
         font = QtGui.QFont()
         font.setPointSize(14)
         self.str.setFont(font)
@@ -149,111 +207,421 @@ class Ui_Dialog(object):
         self.str_pwd.setFont(font)
         self.str_pwd.setObjectName("str_pwd")
         self.browse_str_but = QtWidgets.QPushButton(self.str)
-        self.browse_str_but.setGeometry(QtCore.QRect(580, 40, 71, 41))
+        self.browse_str_but.setGeometry(QtCore.QRect(630, 40, 71, 41))
         font = QtGui.QFont()
         font.setPointSize(12)
         font.setBold(True)
         font.setWeight(75)
         self.browse_str_but.setFont(font)
         self.browse_str_but.setObjectName("browse_str_but")
-        self.report = QtWidgets.QGroupBox(Dialog)
-        self.report.setGeometry(QtCore.QRect(20, 310, 401, 131))
-        font = QtGui.QFont()
-        font.setPointSize(14)
-        self.report.setFont(font)
-        self.report.setObjectName("report")
-        self.report_label = QtWidgets.QLabel(self.report)
-        self.report_label.setGeometry(QtCore.QRect(20, 30, 361, 91))
-        font = QtGui.QFont()
-        font.setPointSize(10)
-        self.report_label.setFont(font)
-        self.report_label.setObjectName("report_label")
-        self.process_but = QtWidgets.QPushButton(Dialog)
-        self.process_but.setGeometry(QtCore.QRect(540, 320, 101, 51))
+        self.button_aeb_run = QtWidgets.QPushButton(self.tab_AEB)
+        self.button_aeb_run.setGeometry(QtCore.QRect(610, 230, 101, 51))
         font = QtGui.QFont()
         font.setPointSize(12)
         font.setBold(True)
         font.setWeight(75)
-        self.process_but.setFont(font)
-        self.process_but.setObjectName("process_but")
-        self.conv_but = QtWidgets.QPushButton(Dialog)
-        self.conv_but.setGeometry(QtCore.QRect(430, 320, 101, 51))
+        self.button_aeb_run.setFont(font)
+        self.button_aeb_run.setObjectName("button_aeb_run")
+        self.AEB_fixed_pose_enb = QtWidgets.QGroupBox(self.tab_AEB)
+        self.AEB_fixed_pose_enb.setGeometry(QtCore.QRect(0, 220, 251, 81))
+        self.AEB_fixed_pose_enb.setCheckable(True)
+        self.AEB_fixed_pose_enb.setChecked(False)
+        self.AEB_fixed_pose_enb.setObjectName("AEB_fixed_pose_enb")
+        self.label_lat = QtWidgets.QLabel(self.AEB_fixed_pose_enb)
+        self.label_lat.setGeometry(QtCore.QRect(20, 30, 31, 20))
+        self.label_lat.setObjectName("label_lat")
+        self.label_lng = QtWidgets.QLabel(self.AEB_fixed_pose_enb)
+        self.label_lng.setGeometry(QtCore.QRect(20, 50, 31, 20))
+        self.label_lng.setObjectName("label_lng")
+        self.textin_lat = QtWidgets.QPlainTextEdit(self.AEB_fixed_pose_enb)
+        self.textin_lat.setGeometry(QtCore.QRect(60, 30, 181, 21))
+        font = QtGui.QFont()
+        font.setPointSize(8)
+        self.textin_lat.setFont(font)
+        self.textin_lat.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
+        self.textin_lat.setPlainText("")
+        self.textin_lat.setObjectName("textin_lat")
+        self.textin_lng = QtWidgets.QPlainTextEdit(self.AEB_fixed_pose_enb)
+        self.textin_lng.setGeometry(QtCore.QRect(60, 50, 181, 21))
+        font = QtGui.QFont()
+        font.setPointSize(8)
+        self.textin_lng.setFont(font)
+        self.textin_lng.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
+        self.textin_lng.setPlainText("")
+        self.textin_lng.setObjectName("textin_lng")
+        self.tabWidget.addTab(self.tab_AEB, "")
+        self.tab_Conv = QtWidgets.QWidget()
+        self.tab_Conv.setObjectName("tab_Conv")
+        self.conv_but = QtWidgets.QPushButton(self.tab_Conv)
+        self.conv_but.setGeometry(QtCore.QRect(610, 240, 101, 51))
         font = QtGui.QFont()
         font.setPointSize(12)
         font.setBold(True)
         font.setWeight(75)
         self.conv_but.setFont(font)
         self.conv_but.setObjectName("conv_but")
-        self.lka_but = QtWidgets.QPushButton(Dialog)
-        self.lka_but.setGeometry(QtCore.QRect(430, 380, 101, 51))
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        font.setBold(True)
-        font.setWeight(75)
-        self.lka_but.setFont(font)
-        self.lka_but.setObjectName("lka_but")
-        self.warn_but = QtWidgets.QPushButton(Dialog)
-        self.warn_but.setGeometry(QtCore.QRect(540, 380, 101, 51))
+        self.tabWidget.addTab(self.tab_Conv, "")
+        self.tab_Dash_det = QtWidgets.QWidget()
+        self.tab_Dash_det.setObjectName("tab_Dash_det")
+        self.warn_but = QtWidgets.QPushButton(self.tab_Dash_det)
+        self.warn_but.setGeometry(QtCore.QRect(610, 240, 101, 51))
         font = QtGui.QFont()
         font.setPointSize(12)
         font.setBold(True)
         font.setWeight(75)
         self.warn_but.setFont(font)
         self.warn_but.setObjectName("warn_but")
+        self.vbo_2 = QtWidgets.QGroupBox(self.tab_Dash_det)
+        self.vbo_2.setGeometry(QtCore.QRect(0, 20, 711, 101))
+        font = QtGui.QFont()
+        font.setPointSize(14)
+        self.vbo_2.setFont(font)
+        self.vbo_2.setObjectName("vbo_2")
+        self.vbo_pwd_2 = QtWidgets.QLabel(self.vbo_2)
+        self.vbo_pwd_2.setGeometry(QtCore.QRect(20, 40, 541, 41))
+        font = QtGui.QFont()
+        font.setPointSize(10)
+        self.vbo_pwd_2.setFont(font)
+        self.vbo_pwd_2.setObjectName("vbo_pwd_2")
+        self.browse_vbo_but_2 = QtWidgets.QPushButton(self.vbo_2)
+        self.browse_vbo_but_2.setGeometry(QtCore.QRect(630, 40, 71, 41))
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        font.setBold(True)
+        font.setWeight(75)
+        self.browse_vbo_but_2.setFont(font)
+        self.browse_vbo_but_2.setObjectName("browse_vbo_but_2")
+        self.vbo_6 = QtWidgets.QGroupBox(self.tab_Dash_det)
+        self.vbo_6.setGeometry(QtCore.QRect(0, 130, 711, 101))
+        font = QtGui.QFont()
+        font.setPointSize(14)
+        self.vbo_6.setFont(font)
+        self.vbo_6.setObjectName("vbo_6")
+        self.dash_sample_pwd_6 = QtWidgets.QLabel(self.vbo_6)
+        self.dash_sample_pwd_6.setGeometry(QtCore.QRect(20, 40, 541, 41))
+        font = QtGui.QFont()
+        font.setPointSize(10)
+        self.dash_sample_pwd_6.setFont(font)
+        self.dash_sample_pwd_6.setObjectName("dash_sample_pwd_6")
+        self.browse_dash_sample = QtWidgets.QPushButton(self.vbo_6)
+        self.browse_dash_sample.setGeometry(QtCore.QRect(630, 40, 71, 41))
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        font.setBold(True)
+        font.setWeight(75)
+        self.browse_dash_sample.setFont(font)
+        self.browse_dash_sample.setObjectName("browse_dash_sample")
+        self.tabWidget.addTab(self.tab_Dash_det, "")
+        self.tab_lka = QtWidgets.QWidget()
+        self.tab_lka.setObjectName("tab_lka")
+        self.vbo_3 = QtWidgets.QGroupBox(self.tab_lka)
+        self.vbo_3.setGeometry(QtCore.QRect(0, 20, 711, 101))
+        font = QtGui.QFont()
+        font.setPointSize(14)
+        self.vbo_3.setFont(font)
+        self.vbo_3.setObjectName("vbo_3")
+        self.vbo_pwd_3 = QtWidgets.QLabel(self.vbo_3)
+        self.vbo_pwd_3.setGeometry(QtCore.QRect(20, 40, 541, 41))
+        font = QtGui.QFont()
+        font.setPointSize(10)
+        self.vbo_pwd_3.setFont(font)
+        self.vbo_pwd_3.setObjectName("vbo_pwd_3")
+        self.browse_vbo_but_3 = QtWidgets.QPushButton(self.vbo_3)
+        self.browse_vbo_but_3.setGeometry(QtCore.QRect(630, 40, 71, 41))
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        font.setBold(True)
+        font.setWeight(75)
+        self.browse_vbo_but_3.setFont(font)
+        self.browse_vbo_but_3.setObjectName("browse_vbo_but_3")
+        self.lka_but = QtWidgets.QPushButton(self.tab_lka)
+        self.lka_but.setGeometry(QtCore.QRect(600, 240, 101, 51))
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        font.setBold(True)
+        font.setWeight(75)
+        self.lka_but.setFont(font)
+        self.lka_but.setObjectName("lka_but")
+        self.vbo_5 = QtWidgets.QGroupBox(self.tab_lka)
+        self.vbo_5.setGeometry(QtCore.QRect(0, 130, 711, 101))
+        font = QtGui.QFont()
+        font.setPointSize(14)
+        self.vbo_5.setFont(font)
+        self.vbo_5.setObjectName("vbo_5")
+        self.gps_ref_pwd_6 = QtWidgets.QLabel(self.vbo_5)
+        self.gps_ref_pwd_6.setGeometry(QtCore.QRect(20, 40, 541, 41))
+        font = QtGui.QFont()
+        font.setPointSize(10)
+        self.gps_ref_pwd_6.setFont(font)
+        self.gps_ref_pwd_6.setObjectName("gps_ref_pwd_6")
+        self.gps_ref_but = QtWidgets.QPushButton(self.vbo_5)
+        self.gps_ref_but.setGeometry(QtCore.QRect(630, 40, 71, 41))
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        font.setBold(True)
+        font.setWeight(75)
+        self.gps_ref_but.setFont(font)
+        self.gps_ref_but.setObjectName("gps_ref_but")
+        self.tabWidget.addTab(self.tab_lka, "")
+        self.tab_sync = QtWidgets.QWidget()
+        self.tab_sync.setObjectName("tab_sync")
+        self.groupBox = QtWidgets.QGroupBox(self.tab_sync)
+        self.groupBox.setGeometry(QtCore.QRect(0, 120, 711, 80))
+        self.groupBox.setObjectName("groupBox")
+        self.label = QtWidgets.QLabel(self.groupBox)
+        self.label.setGeometry(QtCore.QRect(20, 30, 111, 31))
+        self.label.setObjectName("label")
+        self.plainTextEdit = QtWidgets.QPlainTextEdit(self.groupBox)
+        self.plainTextEdit.setGeometry(QtCore.QRect(150, 30, 91, 31))
+        self.plainTextEdit.setObjectName("plainTextEdit")
+        self.time_sync_but = QtWidgets.QPushButton(self.groupBox)
+        self.time_sync_but.setGeometry(QtCore.QRect(600, 20, 101, 51))
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        font.setBold(True)
+        font.setWeight(75)
+        self.time_sync_but.setFont(font)
+        self.time_sync_but.setObjectName("time_sync_but")
+        self.vbo_4 = QtWidgets.QGroupBox(self.tab_sync)
+        self.vbo_4.setGeometry(QtCore.QRect(0, 20, 711, 101))
+        font = QtGui.QFont()
+        font.setPointSize(14)
+        self.vbo_4.setFont(font)
+        self.vbo_4.setObjectName("vbo_4")
+        self.vbo_pwd_4 = QtWidgets.QLabel(self.vbo_4)
+        self.vbo_pwd_4.setGeometry(QtCore.QRect(20, 40, 541, 41))
+        font = QtGui.QFont()
+        font.setPointSize(10)
+        self.vbo_pwd_4.setFont(font)
+        self.vbo_pwd_4.setObjectName("vbo_pwd_4")
+        self.browse_vbo_but_4 = QtWidgets.QPushButton(self.vbo_4)
+        self.browse_vbo_but_4.setGeometry(QtCore.QRect(630, 40, 71, 41))
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        font.setBold(True)
+        font.setWeight(75)
+        self.browse_vbo_but_4.setFont(font)
+        self.browse_vbo_but_4.setObjectName("browse_vbo_but_4")
+        self.tabWidget.addTab(self.tab_sync, "")
+        self.tab_CANLOG = QtWidgets.QWidget()
+        self.tab_CANLOG.setObjectName("tab_CANLOG")
+        self.tabWidget.addTab(self.tab_CANLOG, "")
 
         self.retranslateUi(Dialog)
         QtCore.QMetaObject.connectSlotsByName(Dialog)
 
-        self.browse_vbo_but.clicked.connect(self.actionOpen_File_VBO)
-        self.browse_str_but.clicked.connect(self.actionOpen_File_STR)
-        self.process_but.clicked.connect(self.actionProcess)
+        self.browse_vbo_but.clicked.connect(lambda: self.action_OpenFile([self.vbo_pwd, self.vbo_pwd_2, self.vbo_pwd_3, self.vbo_pwd_4] , 'vbo', 'VBO_FILE_NAME'))
+        self.browse_vbo_but_2.clicked.connect(lambda: self.action_OpenFile([self.vbo_pwd, self.vbo_pwd_2, self.vbo_pwd_3, self.vbo_pwd_4], 'vbo', 'VBO_FILE_NAME'))
+        self.browse_vbo_but_3.clicked.connect(lambda: self.action_OpenFile([self.vbo_pwd, self.vbo_pwd_2, self.vbo_pwd_3, self.vbo_pwd_4], 'vbo', 'VBO_FILE_NAME'))
+        self.browse_vbo_but_4.clicked.connect(lambda: self.action_OpenFile([self.vbo_pwd, self.vbo_pwd_2, self.vbo_pwd_3, self.vbo_pwd_4], 'vbo', 'VBO_FILE_NAME'))
+        self.browse_str_but.clicked.connect(lambda: self.action_OpenFile(self.str_pwd, 'csv','STR_FILE_NAME'))
+        self.gps_ref_but.clicked.connect(lambda: self.action_OpenFile(self.gps_ref_pwd_6, 'csv', 'GPS_REF_FILE_NAME'))
+        self.browse_dash_sample.clicked.connect(lambda: self.action_OpenFile(self.dash_sample_pwd_6, 'png', 'IMAGE_FILE_NAME'))
+        self.button_aeb_run.clicked.connect(self.actionAEB)
+        # self.browse_str_but.clicked.connect(self.actionOpen_File_STR)
+        # self.process_but.clicked.connect(self.actionProcess)
         self.conv_but.clicked.connect(self.actionConv)
-        self.lka_but.clicked.connect(self.actionLKA)
-        self.warn_but.clicked.connect(self.actionWarn)
+        # self.lka_but.clicked.connect(self.actionLKA)
+        # self.warn_but.clicked.connect(self.actionWarn)
 
     def retranslateUi(self, Dialog):
         _translate = QtCore.QCoreApplication.translate
-        Dialog.setWindowTitle(_translate("Dialog", "Post-Processing Tool"))
+        Dialog.setWindowTitle(_translate("Dialog", "VBOX Data Processor"))
+        self.report.setTitle(_translate("Dialog", "Report"))
         self.vbo.setTitle(_translate("Dialog", "VBOX "))
         self.vbo_pwd.setText(_translate("Dialog", "Select log File"))
         self.browse_vbo_but.setText(_translate("Dialog", "Browse"))
         self.str.setTitle(_translate("Dialog", "Soft Target Robot"))
         self.str_pwd.setText(_translate("Dialog", "Select log File"))
         self.browse_str_but.setText(_translate("Dialog", "Browse"))
-        self.report.setTitle(_translate("Dialog", "Report"))
-        self.report_label.setText(_translate("Dialog", ""))
-        self.process_but.setText(_translate("Dialog", "AEB Sync"))
+        self.button_aeb_run.setText(_translate("Dialog", "AEB Sync"))
+        self.AEB_fixed_pose_enb.setTitle(_translate("Dialog", "Fixed Crossing Point"))
+        self.label_lat.setText(_translate("Dialog", "LAT"))
+        self.label_lng.setText(_translate("Dialog", "LNG"))
+        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_AEB), _translate("Dialog", "TTC Calc."))
         self.conv_but.setText(_translate("Dialog", "VBO to CSV"))
-        self.lka_but.setText(_translate("Dialog", "LKA Proc"))
+        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_Conv), _translate("Dialog", "Convertors"))
         self.warn_but.setText(_translate("Dialog", "Warning"))
+        self.vbo_2.setTitle(_translate("Dialog", "VBOX "))
+        self.vbo_pwd_2.setText(_translate("Dialog", "Select log File"))
+        self.browse_vbo_but_2.setText(_translate("Dialog", "Browse"))
+        self.vbo_6.setTitle(_translate("Dialog", "Sample Image"))
+        self.dash_sample_pwd_6.setText(_translate("Dialog", "Select log File"))
+        self.browse_dash_sample.setText(_translate("Dialog", "Browse"))
+        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_Dash_det), _translate("Dialog", "Dashcam Det."))
+        self.vbo_3.setTitle(_translate("Dialog", "VBOX "))
+        self.vbo_pwd_3.setText(_translate("Dialog", "Select log File"))
+        self.browse_vbo_but_3.setText(_translate("Dialog", "Browse"))
+        self.lka_but.setText(_translate("Dialog", "LKA Proc"))
+        self.vbo_5.setTitle(_translate("Dialog", "GPS Reference"))
+        self.gps_ref_pwd_6.setText(_translate("Dialog", "Select log File"))
+        self.gps_ref_but.setText(_translate("Dialog", "Browse"))
+        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_lka), _translate("Dialog", "LKA Eval"))
+        self.groupBox.setTitle(_translate("Dialog", "Video CAN Sync"))
+        self.label.setText(_translate("Dialog", "Time Offset [s]"))
+        self.time_sync_but.setText(_translate("Dialog", "Sync"))
+        self.vbo_4.setTitle(_translate("Dialog", "VBOX "))
+        self.vbo_pwd_4.setText(_translate("Dialog", "Select log File"))
+        self.browse_vbo_but_4.setText(_translate("Dialog", "Browse"))
+        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_sync), _translate("Dialog", "Time Sync"))
+        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_CANLOG), _translate("Dialog", "CAN Process"))
 
-    def actionOpen_File_VBO(self):
-        temp = QtWidgets.QFileDialog.getOpenFileName(caption='Select *.vbo file', filter='vbo(*.vbo)')
-        if temp and temp[0][-4:]=='.vbo':
-            self.VBO_FILE_NAME = temp[0]
-            self.vbo_received=True
-            self.vbo_pwd.setText(QtCore.QCoreApplication.translate("Dialog", self.VBO_FILE_NAME))
-        else:
-            # msg = QMessageBox()
-            # msg.setWindowTitle("Image Found")
-            # msg.setText(f"{len(self.IMG_LIST)} images found!")
-            # msg.setIcon(QMessageBox.Information)
-            # msg.exec_()
-            self.vbo_received = False
+    def action_OpenFile(self, pwd_str, extention, attr):
+        temp = QtWidgets.QFileDialog.getOpenFileName(caption=f'Select *.{extention} file', filter=f'{extention}(*.{extention})')
+        if temp and temp[0][-4:]==f'.{extention}':
+            if type(pwd_str) == list:
+                for str in pwd_str:
+                    str.setText(QtCore.QCoreApplication.translate("Dialog", temp[0]))
+            else:
+                pwd_str.setText(QtCore.QCoreApplication.translate("Dialog", temp[0]))
+            reportUpdate(f'{extention} file selected', self.report_label, True)
+            setattr(self, attr, temp[0])
 
-    def actionOpen_File_STR(self):
-        temp = QtWidgets.QFileDialog.getOpenFileName(caption='Select *.csv file', filter='csv(*.csv)')
-        if temp and temp[0][-4:]=='.csv':
-            self.RST_FILE_NAME = temp[0]
-            self.rst_received=True
-            self.str_pwd.setText(QtCore.QCoreApplication.translate("Dialog", self.RST_FILE_NAME))
+
+    def read_vbo(self):
+        if self.VBO_FILE_NAME==None:
+            return None, None, None
+        secs=[]
+        with open(self.VBO_FILE_NAME, 'r') as f:
+            for i, l in enumerate(f):    
+                if '[' in l:
+                    header = secs.append((l, i))
+        with open(self.VBO_FILE_NAME, 'r') as f:
+            for sec in secs:
+                if 'column names' in sec[0]:
+                    cols = f.readlines()[sec[1]+1]
+            while cols[-1] in ['\n', ' ']:
+                cols = cols[:-1]
+            cols = cols.split(' ') 
+        with open(self.VBO_FILE_NAME, 'r') as f:
+            for sec in secs:
+                if 'data' in sec[0]:
+                    lines = f.readlines()[sec[1]+1:]
+        df = []
+        for l in lines:
+            df.append(list(l[:-1].split(' ')))
+        vbo = pd.DataFrame(df, columns=cols)
+        return vbo, cols, secs
+    
+    def read_csv(self):
+        if self.STR_FILE_NAME==None:
+            return None
+        stride = pd.read_csv(self.STR_FILE_NAME)
+        return stride
+    
+    def write_vbo(self, vbo):
+        _, cols, secs = self.read_vbo()
+        vbo.to_csv('vbo.csv', sep=' ', header=None, index=None)
+        reportUpdate(f'[INFO] Gnerating new VBO...', self.report_label, new=True)
+        if self.VBO_FILE_NAME[:-4][-2:]!='_E':
+            TARGET_FILE_NAME = self.VBO_FILE_NAME[:-4]+'_E.vbo'
         else:
-            # msg = QMessageBox()
-            # msg.setWindowTitle("Image Found")
-            # msg.setText(f"{len(self.IMG_LIST)} images found!")
-            # msg.setIcon(QMessageBox.Information)
-            # msg.exec_()
-            self.rst_received = False
+            TARGET_FILE_NAME = self.VBO_FILE_NAME
+
+        with open(self.VBO_FILE_NAME, 'r') as f:
+            T_header = f.readlines()[:secs[1][1]-1]
+            for c in vbo.columns:
+                if c not in cols:
+                    T_header.append(c+'\n')
+            T_header.append('\n')
+
+        with open(self.VBO_FILE_NAME, 'r') as f:
+            T_channel_units = f.readlines()[secs[1][1]:secs[2][1]-1]
+            T_channel_units.append('\n')
+
+        with open(self.VBO_FILE_NAME, 'r') as f:
+            T_fill = f.readlines()[secs[2][1]:secs[4][1]-1]
+            T_fill.append('\n')
+
+        with open(self.VBO_FILE_NAME, 'r') as f:
+            T_columns = f.readlines()[secs[4][1]:secs[5][1]+1]
+            while T_columns[1][-1] in ['\n', ' ']:
+                T_columns[1] = T_columns[1][:-1]
+            for c in vbo.columns:
+                if c not in cols:
+                    T_columns[1] += ' '+c
+            T_columns[1] += '\n'
+
+        with open('vbo.csv', 'r') as f:
+            data = f.readlines()
+
+        with open(TARGET_FILE_NAME, 'w') as f:
+            for l in T_header:
+                f.write(l)
+            for l in T_channel_units:
+                f.write(l)
+            for l in T_fill:
+                f.write(l)
+            for l in T_columns:
+                f.write(l)
+            for l in data:
+                f.write(l)
+        reportUpdate(f'[INFO] DONE', obj=self.report_label, new=True)
+        
+        msg = QMessageBox()
+        msg.setWindowTitle("Accomplished")
+        msg.setText('New file:' + TARGET_FILE_NAME)
+        msg.setIcon(QMessageBox.Information)
+        msg.exec_()
+    
+    def actionAEB(self):
+        reportUpdate(f'Initializing AEB process...', self.report_label, True)
+        if self.VBO_FILE_NAME is None:
+            reportUpdate(f'Please select VBO file', self.report_label, True)
+            return
+        vbo, _, _ = self.read_vbo()
+        reportUpdate(f'VBO file is loaded', self.report_label, True)
+        if self.AEB_fixed_pose_enb.isChecked():
+            lat = self.textin_lat.toPlainText()
+            lng = self.textin_lng.toPlainText()
+            if lat and lng:
+                try:
+                    coords_trigger = (float(lat), float(lng))
+                    reportUpdate(f'Fixed crossing point set to {coords_trigger}', self.report_label, True)
+                except ValueError:
+                    msg = QMessageBox()
+                    msg.setWindowTitle("Error")
+                    msg.setText("Please enter valid numeric coordinates for the fixed crossing point")
+                    msg.setIcon(QMessageBox.Critical)
+                    msg.exec_()
+                    return
+            else:
+                msg = QMessageBox()
+                msg.setWindowTitle("Error")
+                msg.setText("Please enter the coordinates of the fixed crossing point")
+                msg.setIcon(QMessageBox.Critical)
+                msg.exec_()
+                return
+        else:
+            stride = self.read_csv()
+            if stride is None:
+                return
+            vlat = np.array([float(x) for x in vbo['PosLat']])/10**7
+            vlng = np.array([float(x) for x in vbo['PosLon']])/10**7
+            slat = np.array([float(x) for x in stride['latitude(deg)']])
+            slng = np.array([float(x) for x in stride['longitude(deg)']])
+            vboSet = {(i, j) for i, j in zip(vlat, vlng)}
+            strSet = {(i, j) for i, j in zip(slat, slng)}
+            C, _ = closest_match(vboSet, strSet)
+            coords_trigger = C[0]
+            reportUpdate(f'Fixed crossing point measured as {coords_trigger}', self.report_label, True)
+        
+        relDistance = []
+        for lat, lng in zip(vbo['PosLat'], vbo['PosLon']):
+            coords = (float(lat)*1e-7, float(lng)*1e-7)
+            relDistance.append((geopy.distance.geodesic(coords_trigger, coords).m)*np.sign(coords_trigger[0]-coords[0]))
+
+        relDistance = [i*np.sign(relDistance[0]) for i in relDistance]
+        TTC = []
+        for d, v in zip(relDistance, [float(i) for i in vbo['KPH']]):
+            if v == 0 or d/v > 20:
+                TTC.append(20)
+            else:
+                TTC.append(d/v)
+        vbo['TTC'] = ['{:010.4f}'.format(i) for i in TTC]
+        vbo['TTC_range'] = ['{:010.4f}'.format(i) for i in relDistance]
+        self.write_vbo(vbo)
+
 
     def actionProcess(self):
         if not (self.rst_received and self.vbo_received):

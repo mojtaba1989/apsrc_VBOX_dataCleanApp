@@ -6,6 +6,27 @@ import subprocess
 script_path = os.path.abspath(__file__)
 script_directory = os.path.dirname(script_path)
 
+def get_current_conda_env():
+    try:
+        # Get the current Conda environment name
+        result = subprocess.run(
+            ['conda', 'env', 'list'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        output = result.stdout
+
+        # Parse the active environment
+        for line in output.splitlines():
+            if "*" in line:
+                # The current environment is marked with '*'
+                env_name = line.split()[0]
+                return env_name
+    except Exception as e:
+        print(f"Error fetching Conda environment: {e}")
+        return None
+
 try:
     conda_base_path = subprocess.Popen(['conda', 'info', '--base'], shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT).stdout.readlines()[0].decode('utf-8').strip()
     
@@ -20,7 +41,8 @@ try:
     #     # Define the shortcut target
         app_name = "process_app.py"
         conda_script_path = r"C:/ProgramData/anaconda3/Scripts/activate.bat"  # Adjust to your path
-        conda_env = "app"  # Name of the Conda environment
+        conda_env = get_current_conda_env()
+        print(f"Found activate.bat at: {conda_env}")  # Name of the Conda environment
         python_script = os.path.join(script_directory, app_name)  # Path to your Python script
 
     #     # Create the full command that the shortcut will run
