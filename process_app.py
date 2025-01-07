@@ -618,10 +618,10 @@ class Ui_Dialog(object):
         relDistance = [i*np.sign(relDistance[0]) for i in relDistance]
         TTC = []
         for d, v in zip(relDistance, [float(i) for i in vbo['KPH']]):
-            if v == 0 or d/v > 20:
-                TTC.append(20)
+            if v == 0:
+                TTC.append(100)
             else:
-                TTC.append(d/v)
+                TTC.append(d/v*3.6)
         vbo['TTC'] = ['{:010.4f}'.format(i) for i in TTC]
         vbo['TTC_range'] = ['{:010.4f}'.format(i) for i in relDistance]
         self.write_vbo(vbo)
