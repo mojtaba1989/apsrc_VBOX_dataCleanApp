@@ -468,12 +468,16 @@ class Ui_Dialog(object):
 
     def action_OpenFile(self, pwd_str, extention, attr):
         temp = QtWidgets.QFileDialog.getOpenFileName(caption=f'Select *.{extention} file', filter=f'{extention}(*.{extention})')
+        if len(temp[0]) > 80:
+            short_temp = '...'+temp[0][-80:]
+        else:
+            short_temp = temp[0]
         if temp and temp[0][-4:]==f'.{extention}':
             if type(pwd_str) == list:
                 for str in pwd_str:
-                    str.setText(QtCore.QCoreApplication.translate("Dialog", temp[0]))
+                    str.setText(QtCore.QCoreApplication.translate("Dialog", short_temp))
             else:
-                pwd_str.setText(QtCore.QCoreApplication.translate("Dialog", temp[0]))
+                pwd_str.setText(QtCore.QCoreApplication.translate("Dialog", short_temp))
             reportUpdate(f'{extention} file selected', self.report_label, True)
             setattr(self, attr, temp[0])
 
